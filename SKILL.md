@@ -32,14 +32,31 @@ ios info --udid "<UDID>"
 ios sysinfo --udid "<UDID>"
 ```
 
-### 日志采集
+### 日志采集（仅使用 `idevicesyslog`）
+
+`idevicesyslog` 完全替代 `ios syslog`。原因：`ios syslog` 在中文日志场景下存在可读性问题。
+
+进程名在记录、分享和沉淀文档时必须脱敏，统一使用占位符 `<APP_PROCESS>`。
 
 ```bash
-ios syslog --udid "<UDID>"
-ios syslog --parse --udid "<UDID>"
+# 实时看主进程日志（只保留 <APP_PROCESS>[pid]）
+idevicesyslog -u "<UDID>" | rg --line-buffered '<APP_PROCESS>\[[0-9]+\]'
+
+# 主进程中仅看错误/告警
+idevicesyslog -u "<UDID>" | rg --line-buffered '<APP_PROCESS>\[[0-9]+\].*(<Error>|<Fault>|<Warning>)'
+
+# 一边查看一边落盘
+idevicesyslog -u "<UDID>" | rg --line-buffered '<APP_PROCESS>\[[0-9]+\]' | tee /tmp/app-main.log
+
+# 后台持续采集
+nohup idevicesyslog -u "<UDID>" | rg --line-buffered '<APP_PROCESS>\[[0-9]+\]' >> /tmp/app-main.log 2>/tmp/app-main.err &
+echo $! > /tmp/app-main.pid
+
+# 停止后台采集
+kill "$(cat /tmp/app-main.pid)"
 ```
 
-用 `openURL`、`deeplink`、`route`、`error` 和业务 ID 作为关键词过滤日志。
+先按 `<APP_PROCESS>\[[0-9]+\]` 缩小范围，再叠加业务关键词（如 `HTTPDNS|ListHelper|crash|error`）定位问题。
 
 ### 安装与卸载
 
@@ -82,8 +99,8 @@ ios wdaproxy --udid "<UDID>"
 ```bash
 xcrun devicectl device process launch \
   --device "<UDID>" \
-  --payload-url "zhihu://question/49242761" \
-  com.zhihu.ios-dev
+  --payload-url "demo://question/49242761" \
+  com.demo.ios-dev
 ```
 
 ### Universal Link（https）
@@ -91,8 +108,8 @@ xcrun devicectl device process launch \
 ```bash
 xcrun devicectl device process launch \
   --device "<UDID>" \
-  --payload-url "https://www.zhihu.com/question/49242761" \
-  com.zhihu.ios-dev
+  --payload-url "https://www.demo.com/question/49242761" \
+  com.demo.ios-dev
 ```
 
 ### 冷启动路由验证
@@ -101,8 +118,8 @@ xcrun devicectl device process launch \
 xcrun devicectl device process launch \
   --device "<UDID>" \
   --terminate-existing \
-  --payload-url "zhihu://question/49242761" \
-  com.zhihu.ios-dev
+  --payload-url "demo://question/49242761" \
+  com.demo.ios-dev
 ```
 
 注意：`devicectl` 使用 `--payload-url`；`ios launch` 不提供等价的系统级 URL 唤起参数。
