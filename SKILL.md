@@ -55,7 +55,7 @@ ios tunnel ls --udid "<UDID>" --nojson
 ### 编译主工程（Debug + 真机）
 
 ```bash
-# 默认：总耗时输出（real/user/sys）
+# 默认：总耗时输出（real/user/sys）, 并且明确告诉用户编译时间
 /usr/bin/time -p xcodebuild \
   -quiet \
   -workspace "<WORKSPACE_PATH>" \
@@ -79,7 +79,7 @@ ios tunnel ls --udid "<UDID>" --nojson
 
 说明：`clean` 会使全量重编译，显著增加耗时。除非用户明确要求或需要排查缓存问题，否则不执行。
 
-如项目提供 `buildServer.json`，优先使用其中的 `workspace` 与 `scheme`。
+注意: 若项目根目录提供 `buildServer.json`，优先使用其中的 `workspace`, `build_root` 与 `scheme`。
 
 ### 复用已有构建产物
 
