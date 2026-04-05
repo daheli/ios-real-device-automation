@@ -1,6 +1,6 @@
 ---
 name: ios-real-device-automation
-description: 在 iOS 真机上执行自动化调试与验证，包括主工程编译（xcodebuild）、应用安装（devicectl）与拉起（ios/devicectl）、日志采集(idevicesyslog)、截图取证、进程控制、WDA 启动与端口转发、Deep Link/Universal Link 唤起。用户提出真机联调、编译安装运行、URL 跳转验证、WDA 连通性排查或证据留存时使用。
+description: 在 iOS 真机上执行自动化调试与验证，包括主工程编译（xcodebuild）、应用安装（devicectl）与拉起（ios/devicectl）、日志采集（形式1.devicectl --console / 形式2.idevicesyslog）、截图取证、进程控制、WDA 启动与端口转发、Deep Link/Universal Link 唤起。用户提出真机联调、编译安装运行、URL 跳转验证、WDA 连通性排查或证据留存时使用。
 ---
 
 # iOS Real Device Automation
@@ -91,9 +91,35 @@ ls "<DERIVED_DATA>/Build/Products/Debug-iphoneos"
 <DERIVED_DATA>/Build/Products/Debug-iphoneos/<APP_NAME>.app
 ```
 
-### 日志采集（仅使用 `idevicesyslog`）
+### 日志采集形式 1：`devicectl --console`
 
-`idevicesyslog` 完全替代 `ios syslog`。原因：`ios syslog` 在中文日志场景下存在可读性问题。
+优先使用此模式来获取日志，`xcrun devicectl device process launch --console`。这条方式会重新拉起 app，更适合冷启动日志和专项链路复现。
+
+关键注意点：
+
+- `devicectl --console` 的日志会同时走 `stdout` 和 `stderr`，过滤前必须先加 `2>&1` 合流，否则 `rg` 看起来会"失效"。
+- 如果只想看专项关键字，用 `rg` 即可。
+- 如果日志是 `回调结果={...}` 这类多行结构，需改用 `awk` 保留整块内容。
+
+```bash
+# 仅看专项关键字
+xcrun devicectl device process launch \
+  --console \
+  --terminate-existing \
+  --device "<UDID>" \
+  com.example.app 2>&1 | rg --line-buffered '<KEYWORD>'
+
+# 一边查看一边落盘
+xcrun devicectl device process launch \
+  --console \
+  --terminate-existing \
+  --device "<UDID>" \
+  com.example.app 2>&1 | rg --line-buffered '<KEYWORD>' | tee /tmp/app-keyword.log
+```
+
+### 日志采集形式 2：`idevicesyslog`
+
+备用获取日志方式, 另外 `idevicesyslog` 完全替代 `ios syslog`。原因：`ios syslog` 在中文日志场景下存在可读性问题。
 
 进程名在记录、分享和沉淀文档时必须脱敏，统一使用占位符 `<APP_PROCESS>`。
 
@@ -129,6 +155,22 @@ in_block {
   if ($0 ~ /^\}/) in_block=0
 }
 '
+```
+
+对于 `devicectl --console`，如果要保留 `<KEYWORD>: 回调结果={...}` 这种完整块，使用下面这种另一种形式：
+
+```bash
+xcrun devicectl device process launch \
+  --console \
+  --terminate-existing \
+  --device "<UDID>" \
+  com.example.app 2>&1 | awk '
+/<KEYWORD>/ { print; in_block=1; next }
+in_block {
+  print
+  if ($0 ~ /^\}/) in_block=0
+}
+' | tee /tmp/app-block.log
 ```
 
 ### 安装与卸载
